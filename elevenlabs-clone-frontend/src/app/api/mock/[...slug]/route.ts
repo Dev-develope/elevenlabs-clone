@@ -1,9 +1,21 @@
 import { NextRequest } from "next/server";
 import { getPresignedUrl } from "~/lib/s3";
+import { VOICE_CATALOG } from "~/server/tts/voice-catalog";
 
+// Mock endpoints used by the voice picker UI during local dev when the
+// real model containers aren't running. The styletts2 + 60db-sync lists
+// are derived from the single source of truth in voice-catalog.ts so the
+// picker and the router stay in sync.
 const services = {
   styletts2: {
-    voices: ["andreas", "woman"],
+    voices: VOICE_CATALOG.filter((v) => v.provider === "styletts2").map(
+      (v) => v.id,
+    ),
+  },
+  "60db-sync": {
+    voices: VOICE_CATALOG.filter((v) => v.provider === "60db-sync").map(
+      (v) => v.id,
+    ),
   },
   "seed-vc": {
     voices: ["andreas", "woman", "trump"],

@@ -23,6 +23,22 @@ export const env = createEnv({
     STYLETTS2_API_ROUTE: z.string(),
     SEED_VC_API_ROUTE: z.string(),
     MAKE_AN_AUDIO_API_ROUTE: z.string(),
+    // ---- 60db TTS (cloud) ----
+    SIXTYDB_API_KEY: z.string(),
+    SIXTYDB_API_BASE: z.string().default("https://api.60db.ai"),
+    // Default provider used when the chosen voice is not bound to a specific
+    // engine (e.g. a freshly imported voice). One of: styletts2 | 60db-sync.
+    // Streaming / WebSocket modes are explicit endpoints; this default only
+    // governs the Inngest async path.
+    DEFAULT_TTS_PROVIDER: z
+      .enum(["styletts2", "60db-sync"])
+      .default("styletts2"),
+    // ---- Sidecar WS proxy (port 3001 by default) ----
+    // Used by the browser to reach the 60db realtime WS without leaking
+    // SIXTYDB_API_KEY. The Next.js app mints a short-lived JWT signed with
+    // WS_PROXY_SECRET; the sidecar verifies it and only then opens the
+    // upstream connection to wss://api.60db.ai/ws/tts?apiKey=SIXTYDB_API_KEY.
+    WS_PROXY_SECRET: z.string(),
   },
 
   /**
@@ -31,7 +47,9 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    // NEXT_PUBLIC_CLIENTVAR: z.string(),
+    // Public URL the browser uses to reach the sidecar WS proxy. Defaults to
+    // localhost in dev — override in deployed envs.
+    NEXT_PUBLIC_WS_PROXY_URL: z.string().default("ws://localhost:3001/tts"),
   },
 
   /**
@@ -50,6 +68,11 @@ export const env = createEnv({
     STYLETTS2_API_ROUTE: process.env.STYLETTS2_API_ROUTE,
     SEED_VC_API_ROUTE: process.env.SEED_VC_API_ROUTE,
     MAKE_AN_AUDIO_API_ROUTE: process.env.MAKE_AN_AUDIO_API_ROUTE,
+    SIXTYDB_API_KEY: process.env.SIXTYDB_API_KEY,
+    SIXTYDB_API_BASE: process.env.SIXTYDB_API_BASE,
+    DEFAULT_TTS_PROVIDER: process.env.DEFAULT_TTS_PROVIDER,
+    WS_PROXY_SECRET: process.env.WS_PROXY_SECRET,
+    NEXT_PUBLIC_WS_PROXY_URL: process.env.NEXT_PUBLIC_WS_PROXY_URL,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

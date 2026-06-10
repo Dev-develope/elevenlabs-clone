@@ -5,6 +5,7 @@ import { inngest } from "~/inngest/client";
 import { getPresignedUrl, getUploadUrl } from "~/lib/s3";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+import { resolveProvider, serviceForProvider } from "~/server/tts/providers";
 import { ServiceType } from "~/types/services";
 
 export async function generateTextToSpeech(text: string, voice: string) {
@@ -12,6 +13,12 @@ export async function generateTextToSpeech(text: string, voice: string) {
   if (!session?.user.id) {
     throw new Error("User not authenticated");
   }
+
+  // Route the request: voice catalog wins, env default fills in for
+  // voices the catalog doesn't know about. Result is persisted on the
+  // clip row so the Inngest worker fans out to the right backend.
+  const provider = resolveProvider(voice);
+  const service = serviceForProvider(provider);
 
   const audioClipJob = await db.generatedAudioClip.create({
     data: {
@@ -22,7 +29,7 @@ export async function generateTextToSpeech(text: string, voice: string) {
           id: session.user.id,
         },
       },
-      service: "styletts2",
+      service,
     },
   });
 
@@ -161,6 +168,8 @@ export async function generationStatus(
 const revalidateBasedOnService = async (service: ServiceType) => {
   switch (service) {
     case "styletts2":
+    case "60db-sync":
+      // Both TTS engines feed the same history page — keep them in sync.
       revalidatePath("/app/speech-synthesis/text-to-speech");
       break;
     case "seedvc":

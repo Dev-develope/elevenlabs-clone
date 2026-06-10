@@ -12,6 +12,8 @@
     "db:studio": "prisma studio",
     "dev": "next dev --turbo",
     "inngest-dev": "npx inngest-cli@latest dev -u http://localhost:3000/api/inngest",
+    "ws-proxy": "cd ../ws-proxy && npm install --silent && npm start",
+    "ws-proxy:dev": "cd ../ws-proxy && npm install --silent && npm run dev",
     "postinstall": "prisma generate",
     "lint": "next lint",
     "lint:fix": "next lint --fix",

@@ -1,6 +1,10 @@
 import { db } from "~/server/db";
 import { inngest } from "./client";
 import { env } from "~/env";
+import {
+  synthesizeWithSixtyDb,
+  uploadSixtyDbAudio,
+} from "~/server/tts/sixtydb-sync";
 
 export const aiGenerationFunction = inngest.createFunction(
   {
@@ -31,6 +35,30 @@ export const aiGenerationFunction = inngest.createFunction(
     });
 
     const result = await step.run("call-api", async () => {
+      // 60db cloud sync has a different shape (returns base64 in JSON; no
+      // backend S3 upload), so handle it before the self-hosted services
+      // and short-circuit with our own S3 write.
+      if (audioClip.service === "60db-sync") {
+        try {
+          const synth = await synthesizeWithSixtyDb({
+            text: audioClip.text ?? "",
+            voiceId: audioClip.voice ?? "",
+          });
+          const { s3Key } = await uploadSixtyDbAudio({
+            audio: synth.audio,
+            outputFormat: synth.outputFormat,
+            audioId: audioClip.id,
+          });
+          return { audio_url: "", s3_key: s3Key };
+        } catch (err) {
+          await db.generatedAudioClip.update({
+            where: { id: audioClip.id },
+            data: { failed: true },
+          });
+          throw err;
+        }
+      }
+
       let response: Response | null = null;
 
       if (audioClip.service === "styletts2") {

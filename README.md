@@ -129,3 +129,46 @@ Add custom policy:
 	]
 }
 ```
+
+## 60db TTS Provider (cloud, alongside StyleTTS2)
+
+The frontend can route text-to-speech requests to either the self-hosted **StyleTTS2** container or the cloud **60db** API. Three 60db surfaces are wired in:
+
+| Surface | Endpoint | UX |
+|---|---|---|
+| Sync REST | `POST https://api.60db.ai/tts-synthesize` | Same flow as StyleTTS2 — job queued through Inngest, audio uploaded to S3 under `sixtydb-output/`, shown in history. |
+| NDJSON Stream | `POST https://api.60db.ai/tts-stream` | Browser fetches `/api/tts/stream`, audio plays back chunk-by-chunk via MediaSource. |
+| WebSocket | `wss://api.60db.ai/ws/tts` | Browser opens `ws://…3001/tts` (sidecar), full bidirectional realtime. |
+
+### Routing
+
+Routing is driven by the **voice catalog** in `src/server/tts/voice-catalog.ts`:
+
+- Each voice declares its `provider` (`styletts2` or `60db-sync`).
+- Server actions call `resolveProvider(voiceId)`; the result becomes `GeneratedAudioClip.service`.
+- Inngest fans out to the right backend on that column.
+- `DEFAULT_TTS_PROVIDER` env var is the fallback for voices the catalog doesn't recognise.
+
+### Required env vars
+
+Append to `.env`:
+
+```
+SIXTYDB_API_KEY=sk_...                        # mandatory
+SIXTYDB_API_BASE=https://api.60db.ai          # optional, default shown
+DEFAULT_TTS_PROVIDER=styletts2                # styletts2 | 60db-sync
+WS_PROXY_SECRET=<random 32+ char secret>      # mandatory if you use WS
+NEXT_PUBLIC_WS_PROXY_URL=ws://localhost:3001/tts   # public-side URL
+```
+
+### Running the WebSocket sidecar
+
+The sidecar lives in `ws-proxy/` (separate Node process) so the Next.js app stays deployable to any host, including Vercel. From `elevenlabs-clone-frontend/`:
+
+```bash
+# one-time: install sidecar deps (auto-done by the scripts below)
+npm run ws-proxy        # production (node server.js)
+npm run ws-proxy:dev    # auto-reload on edits
+```
+
+The sidecar requires `SIXTYDB_API_KEY`, `WS_PROXY_SECRET`, and (optionally) `PORT` / `SIXTYDB_API_BASE` in its environment.
